@@ -19,7 +19,7 @@ public class ConsumingLinkedData {
 //    private Model model = ModelFactory.createDefaultModel();
     private static String resource = "<http://dbpedia.org/resource/>";
     private static String ontology = "<http://dbpedia.org/ontology/>";
-    private static String category = "<http://dbpedia.org/Category:>";
+    private static String category = "<http://dbpedia.org/resource/Category:>";
     private static String terms = "<http://purl.org/dc/terms/>";
     private static String property = "<http://dbpedia.org/property/>";
     private static String skos = "<http://www.w3.org/2004/02/skos/core#>";
@@ -70,7 +70,7 @@ public class ConsumingLinkedData {
     }
 
     public List<Map<String, String>> findAllCategories() {
-        String queryString = "PREFIX skos: " + skos + "SELECT ?category WHERE { ?category skos:broader dbc:Tourist_attractions . }";
+        String queryString = "PREFIX skos: " + skos + "PREFIX dbc: " + category + "SELECT ?category WHERE { ?category skos:broader dbc:Tourist_attractions . }";
         return findAll(queryString);
     }
 
