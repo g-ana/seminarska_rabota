@@ -2,6 +2,7 @@ package com.example.wbs;
 
 import org.apache.jena.query.*;
 import org.apache.jena.rdf.model.Model;
+import org.apache.jena.rdf.model.ModelFactory;
 import org.apache.jena.rdf.model.Statement;
 import org.apache.jena.rdf.model.StmtIterator;
 import org.springframework.stereotype.Repository;
@@ -33,21 +34,27 @@ public class ConsumingLinkedData {
             ResultSet results = queryExecution.execSelect();
             while (results.hasNext()) {
                 QuerySolution solution = results.nextSolution();
+                System.out.println(solution);
+                String url = solution.get("category").toString();
+                Model model = ModelFactory.createDefaultModel().read(url);
                 Map<String, String> result = new HashMap<String, String>();
-                String label = solution.getLiteral("label").toString();
-                String thumbnail = solution.getResource("thumbnail").getURI();
-                String depiction = solution.getResource("depiction").getURI();
-                String comment = solution.getLiteral("abstract").toString();
-                String caption = solution.getLiteral("caption").toString();
-                result.put("label", label);
-                result.put("thumbnail", thumbnail);
-                result.put("depiction", depiction);
-                result.put("comment", comment);
-                result.put("caption", caption);
+                StmtIterator iterator = model.listStatements();
+                String label = "";
+                while (iterator.hasNext()) {
+                    Statement nextStatement = iterator.nextStatement();
+                    String predicate = nextStatement.getPredicate().toString();
+                    if (predicate.contains("label")) {
+                        label = nextStatement.getObject().asLiteral().toString();
+                        label = label.substring(0, label.length() - 3);
+                        result.put("label", label);
+                        //    System.out.println(label);
+                        //    break;
+                    }
+                }
                 all.add(result);
             }
+            return all;
         }
-        return all;
     }
 
     private static List<Map<String, String>> findAllPaged(String queryString, int page, int pageSize) {
@@ -62,6 +69,9 @@ public class ConsumingLinkedData {
     }
 
     private static Model findByName(String name) throws QueryExecException {
+        if (name.contains(" ")) {
+            name = name.replace(" ", "_");
+        }
         String queryString = "PREFIX dbr: " + resource + "DESCRIBE dbr:" + name;
         Query query = QueryFactory.create(queryString);
         try (QueryExecution queryExecution = QueryExecutionFactory.sparqlService(SPARQLEndpoint, query)) {
@@ -78,12 +88,43 @@ public class ConsumingLinkedData {
         Model model = findByName(name);
         StmtIterator stmtIterator = model.listStatements();
         Map<String, String> result = new HashMap<String, String>();
+        String label = "";
         while (stmtIterator.hasNext()) {
             Statement nextStatement = stmtIterator.nextStatement();
             String predicate = nextStatement.getPredicate().toString();
-            if (predicate.contains("label")) {
-                String label = nextStatement.getObject().asLiteral().toString();
+            if (predicate.contains("label") && nextStatement.getLanguage().equals("en")) {
+                label = nextStatement.getObject().asLiteral().toString();
+                label = label.substring(0, label.length()-3);
                 result.put("label", label);
+            }
+        }
+        String resourceUrl = label.endsWith("ies") ? resource.substring(0, resource.length()-1) +
+                label.substring(0, label.length()-3) + "y>" :
+                label.endsWith("ches") ? resource.substring(0, resource.length()-1)
+                + label.substring(0, label.length()-2) + ">" :
+                label.endsWith("s") ? resource.substring(0, resource.length()-1)
+                + label.substring(0, label.length()-1) + ">"
+                : resource.substring(0, resource.length()-1) + label + ">";
+        //    System.out.println(resource.substring(0, resource.length()-1) + label.substring(0, label.length()-2) + ">");
+        //    System.out.println(resourceUrl);
+        Model model2 = ModelFactory.createDefaultModel().read(resourceUrl.substring(1, resourceUrl.length()-1));
+        StmtIterator statements = model2.listStatements();
+        while (statements.hasNext()) {
+            Statement nextStatement = statements.nextStatement();
+            String predicate = nextStatement.getPredicate().toString();
+            if (predicate.contains("abstract") && nextStatement.getLanguage().equals("en")) {
+                String comment = nextStatement.getObject().asLiteral().toString();
+                comment = comment.substring(0, comment.length()-3);
+                result.put("abstract", comment);
+            } else if (predicate.contains("caption")) {
+                String caption = nextStatement.getObject().asLiteral().toString();
+                result.put("caption", caption);
+            } else if (predicate.contains("thumbnail")) {
+                String thumbnail = nextStatement.getObject().asResource().getURI();
+                result.put("thumbnail", thumbnail);
+            } else if (predicate.contains("depiction")) {
+                String depiction = nextStatement.getObject().asResource().getURI();
+                result.put("depiction", depiction);
             }
         }
         return result;
@@ -169,7 +210,7 @@ public class ConsumingLinkedData {
     }
 
     public Map<String, String> findLandmarkByName(String name) {
-        String queryString = "DESCRIBE <http://dbpedia.org/resource/" + name + ">";
+        String queryString = "DESCRIBE " + resource.substring(0, resource.length()-1) + name + ">";
         Query query = QueryFactory.create(queryString);
         Map<String, String> result = new HashMap<String, String>();
         try (QueryExecution queryExecution = QueryExecutionFactory.sparqlService(SPARQLEndpoint, query)) {
@@ -178,10 +219,10 @@ public class ConsumingLinkedData {
             while (stmtIterator.hasNext()) {
                 Statement nextStatement = stmtIterator.nextStatement();
                 String predicate = nextStatement.getPredicate().toString();
-                if (predicate.contains("label")) {
+                if (predicate.contains("label") && nextStatement.getLanguage().equals("en")) {
                     String label = nextStatement.getObject().asLiteral().toString();
                     result.put("label", label);
-                } else if (predicate.contains("abstract")) {
+                } else if (predicate.contains("abstract") && nextStatement.getLanguage().equals("en")) {
                     String comment = nextStatement.getObject().asLiteral().toString();
                     result.put("abstract", comment);
                 } else if (predicate.contains("thumbnail")) {
@@ -3924,10 +3965,10 @@ public class ConsumingLinkedData {
         return result;
     }
 
-       public static void main(String [] args) {
+ /*      public static void main(String [] args) {
            ConsumingLinkedData consumingLinkedData = new ConsumingLinkedData();
-           List<Map<String, String>> categories = consumingLinkedData.findAllCategories();
-           System.out.println(categories.toString());
+           Map<String, String> beaches = consumingLinkedData.findCategoryByName("Beaches");
+           System.out.println(beaches.toString()); */
        /*    consumingLinkedData.findAllBeaches();
            System.out.println();
            consumingLinkedData.findAllBeachesByCountry("Australia"); */
@@ -4094,6 +4135,5 @@ public class ConsumingLinkedData {
             String comment = c.toString();
             System.out.println(comment);
         } */
-    }
+//    }
 }
-
