@@ -214,7 +214,7 @@ public class ConsumingLinkedData {
         Query query = QueryFactory.create(queryString);
         Map<String, String> result = new HashMap<String, String>();
         try (QueryExecution queryExecution = QueryExecutionFactory.sparqlService(SPARQLEndpoint, query)) {
-            Model model = queryExecution.execDescribe();
+            Model model = findByName(name);
             StmtIterator stmtIterator = model.listStatements();
             while (stmtIterator.hasNext()) {
                 Statement nextStatement = stmtIterator.nextStatement();
