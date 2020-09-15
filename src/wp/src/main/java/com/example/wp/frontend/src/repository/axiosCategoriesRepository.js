@@ -2,7 +2,7 @@ import axios from '../custom_axios/axios';
 
 const CategoriesService = {
     fetchAllCategories: () => {
-        return axios.get(`api/categories/all`);
+        return axios.get(`/api/categories/all`);
     },
     fetchCategoryByName: (name) => {
         return axios.get(`/api/categories/${name}`);
