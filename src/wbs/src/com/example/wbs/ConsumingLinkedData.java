@@ -1,16 +1,22 @@
 package com.example.wbs;
 
+import org.apache.jena.atlas.json.JsonString;
+import org.json.JSONException;
+import org.json.JSONObject;
 import org.apache.jena.query.*;
 import org.apache.jena.rdf.model.Model;
 import org.apache.jena.rdf.model.ModelFactory;
 import org.apache.jena.rdf.model.Statement;
 import org.apache.jena.rdf.model.StmtIterator;
+// import org.h2.util.json.JSONObject;
 import org.springframework.stereotype.Repository;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+
+// import com.example.wp.backend.model.*;
 
 @Repository
 public class ConsumingLinkedData {
@@ -26,6 +32,14 @@ public class ConsumingLinkedData {
     private static String skos = "<http://www.w3.org/2004/02/skos/core#>";
 //    private int page = 0;
 //    private int pageSize = 2;
+
+//    private RawJsonDeserializer rawJsonDeserializer = new RawJsonDeserializer();
+
+/*    private static JSONObject toJsonObject(Object object) throws JSONException {
+        StringBuilder jsonString = new StringBuilder();
+        jsonString.append(object.toString());
+        return new JSONObject(jsonString.toString());
+    } */
 
     private static List<Map<String, String>> findAll(String queryString) {
         Query query = QueryFactory.create(queryString);
@@ -57,16 +71,17 @@ public class ConsumingLinkedData {
         }
     }
 
-    private static List<Map<String, String>> findAllPaged(String queryString, int page, int pageSize) {
-        List<Map<String, String>> paged = findAll(queryString);
-        int pageStart = page * pageSize;
-        int pageEnd = (page + 1) * pageSize;
-        int contentEnd = paged.size() - 1;
-        if (paged.size() < pageEnd) {
-            return paged.subList(pageStart, contentEnd);
+        private static List<Map<String, String>> findAllPaged (String queryString,int page, int pageSize){
+            List<Map<String, String>> paged = findAll(queryString);
+            int pageStart = page * pageSize;
+            int pageEnd = (page + 1) * pageSize;
+            int contentEnd = paged.size() - 1;
+            if (paged.size() < pageEnd) {
+                return paged.subList(pageStart, contentEnd);
+            }
+            return paged.subList(pageStart, pageEnd);
         }
-        return paged.subList(pageStart, pageEnd);
-    }
+
 
     private static Model findByName(String name) throws QueryExecException {
         if (name.contains(" ")) {
@@ -79,10 +94,48 @@ public class ConsumingLinkedData {
         }
     }
 
-    public List<Map<String, String>> findAllCategories() {
-        String queryString = "PREFIX skos: " + skos + "PREFIX dbc: " + category + "SELECT ?category WHERE { ?category skos:broader dbc:Tourist_attractions . }";
-        return findAll(queryString);
+     public List<Map<String, String>> findAllCategories() {
+         String queryString = "PREFIX skos: " + skos + "PREFIX dbc: " + category + "SELECT ?category WHERE { ?category skos:broader dbc:Tourist_attractions . }";
+         return findAll(queryString);
+     /*   List<Map<String, String>> categories = new ArrayList<Map<String, String>>();
+        Map<String, String> category = new HashMap<String, String>();
+        category.put("label", "beaches");
+        categories.add(category);
+        category.put("label", "buildings");
+        categories.add(category);
+        return categories; */
     }
+
+    /* public List<Category> findAllCategories() {
+        String queryString = "PREFIX skos: " + skos + "PREFIX dbc: " + category + "SELECT ?category WHERE { ?category skos:broader dbc:Tourist_attractions . }";
+        Query query = QueryFactory.create(queryString);
+        List<Category> all = new ArrayList<Map<String, String>>();
+        try (QueryExecution queryExecution = QueryExecutionFactory.sparqlService(SPARQLEndpoint, query)) {
+            ResultSet results = queryExecution.execSelect();
+            while (results.hasNext()) {
+                QuerySolution solution = results.nextSolution();
+                System.out.println(solution);
+                String url = solution.get("category").toString();
+                Model model = ModelFactory.createDefaultModel().read(url);
+                Category result = new Category();
+                StmtIterator iterator = model.listStatements();
+                String label = "";
+                while (iterator.hasNext()) {
+                    Statement nextStatement = iterator.nextStatement();
+                    String predicate = nextStatement.getPredicate().toString();
+                    if (predicate.contains("label")) {
+                        label = nextStatement.getObject().asLiteral().toString();
+                        label = label.substring(0, label.length() - 3);
+                        result.setLabel(label);
+                        //    System.out.println(label);
+                        //    break;
+                    }
+                }
+                all.add(result);
+            }
+        }
+        return all;
+    } */
 
     public Map<String, String> findCategoryByName(String name) {
         Model model = findByName(name);
@@ -210,10 +263,10 @@ public class ConsumingLinkedData {
     }
 
     public Map<String, String> findLandmarkByName(String name) {
-        String queryString = "DESCRIBE " + resource.substring(0, resource.length()-1) + name + ">";
-        Query query = QueryFactory.create(queryString);
+    //    String queryString = "DESCRIBE " + resource.substring(0, resource.length()-1) + "/" + name + ">";
+    //    Query query = QueryFactory.create(queryString);
         Map<String, String> result = new HashMap<String, String>();
-        try (QueryExecution queryExecution = QueryExecutionFactory.sparqlService(SPARQLEndpoint, query)) {
+    //    try (QueryExecution queryExecution = QueryExecutionFactory.sparqlService(SPARQLEndpoint, query)) {
             Model model = findByName(name);
             StmtIterator stmtIterator = model.listStatements();
             while (stmtIterator.hasNext()) {
@@ -235,8 +288,10 @@ public class ConsumingLinkedData {
                     String caption = nextStatement.getObject().asLiteral().toString();
                     result.put("caption", caption);
                 } else if (predicate.contains("placeType")) {
-                    String placeType = nextStatement.getObject().asResource().getURI();
-                    result.put("placeTypeUri", placeType);
+                    String placeTypeUri = nextStatement.getObject().asResource().getURI();
+                    result.put("placeTypeUri", placeTypeUri);
+                    String placeType = nextStatement.getObject().asResource().getLocalName();
+                    result.put("placeType", placeType);
                 } else if (predicate.contains("deathPlace")) {
                     String deathPlaceUri = nextStatement.getObject().asResource().getURI();
                     result.put("deathPlaceUri", deathPlaceUri);
@@ -261,9 +316,6 @@ public class ConsumingLinkedData {
                     result.put("crossesUri", crossesUri);
                     String crosses = nextStatement.getObject().asResource().getLocalName();
                     result.put("crosses", crosses);
-                } else if (predicate.contains("designer")) {
-                    String designer = nextStatement.getObject().asLiteral().toString();
-                    result.put("designer", designer);
                 } else if (predicate.contains("width")) {
                     String width = nextStatement.getObject().asLiteral().toString();
                     result.put("width", width);
@@ -419,10 +471,10 @@ public class ConsumingLinkedData {
                     String builder = nextStatement.getObject().asResource().getLocalName();
                     result.put("builder", builder);
                 } else if (predicate.contains("controlledby")) {
-                    String controlledbyUri = nextStatement.getObject().asResource().getURI();
-                    result.put("controlledbyUri", controlledbyUri);
-                    String controlledby = nextStatement.getObject().asResource().getLocalName();
-                    result.put("controlledby", controlledby);
+                    String controlledByUri = nextStatement.getObject().asResource().getURI();
+                    result.put("controlledByUri", controlledByUri);
+                    String controlledBy = nextStatement.getObject().asResource().getLocalName();
+                    result.put("controlledBy", controlledBy);
                 } else if (predicate.contains("buildingStartDate")) {
                     String buildingStartDate = nextStatement.getObject().asLiteral().toString();
                     result.put("buildingStartDate", buildingStartDate);
@@ -601,11 +653,6 @@ public class ConsumingLinkedData {
                     result.put("mouthPlaceUri", mouthPlaceUri);
                     String mouthPlace = nextStatement.getObject().asResource().getLocalName();
                     result.put("mouthPlace", mouthPlace);
-                } else if (predicate.contains("river")) {
-                    String riverUri = nextStatement.getObject().asResource().getURI();
-                    result.put("riverUri", riverUri);
-                    String river = nextStatement.getObject().asResource().getLocalName();
-                    result.put("river", river);
                 } else if (predicate.contains("url")) {
                     String url = nextStatement.getObject().asResource().getURI();
                     result.put("url", url);
@@ -644,7 +691,7 @@ public class ConsumingLinkedData {
                 }
             }
             return result;
-        }
+//        }
     }
 
     public List<Map<String, String>> findLandmarksPaged(int page, int size) {
@@ -913,13 +960,19 @@ public class ConsumingLinkedData {
             } else if (predicate.contains("depiction")) {
                 String depiction = nextStatement.getObject().asResource().toString();
                 result.put("depiction", depiction);
-            } /* else if (predicate.contains("foundingYear")) {
-                Date foundingYear = new Date(nextStatement.getObject().asLiteral().toString());
+            }  else if (predicate.contains("foundingYear")) {
+            //    Date foundingYear = new Date(nextStatement.getObject().asLiteral().toString());
+                String foundingYear = nextStatement.getObject().asLiteral().toString();
+                result.put("foundingYear", foundingYear);
             } else if (predicate.contains("yearDemolished")) {
-                Date yearDemolished = nextStatement.getObject().asLiteral().getDate();
+            //    Date yearDemolished = nextStatement.getObject().asLiteral().getDate();
+                String yearDemolished = nextStatement.getObject().asLiteral().toString();
+                result.put("yearDemolished", yearDemolished);
             } else if (predicate.contains("openingDate")) {
-                Date openingDate = nextStatement.getObject().asLiteral().getDate();
-            } */ else if (predicate.contains("founder")) {
+            //    Date openingDate = nextStatement.getObject().asLiteral().getDate();
+                String openingDate = nextStatement.getObject().asLiteral().toString();
+                result.put("openingDate", openingDate);
+            }  else if (predicate.contains("founder")) {
                 String founder = nextStatement.getObject().asLiteral().toString();
                 result.put("founder", founder);
             } else if (predicate.contains("locationCity")) {
@@ -935,7 +988,7 @@ public class ConsumingLinkedData {
             } else if (predicate.contains("numberOfLocations")) {
             //    Integer numberOfLocations = nextStatement.getObject().asLiteral().getInt();
                 String numberOfLocations = nextStatement.getObject().asLiteral().toString();
-                result.put("nummberOfLocations", numberOfLocations);
+                result.put("numberOfLocations", numberOfLocations);
             } else if (predicate.contains("slogan")) {
                 String slogan = nextStatement.getObject().asLiteral().toString();
                 result.put("slogan", slogan);
@@ -1105,9 +1158,11 @@ public class ConsumingLinkedData {
             } else if (predicate.contains("officialName")) {
                 String officialName = nextStatement.getObject().asLiteral().toString();
                 result.put("officialName", officialName);
-            } /* else if (predicate.contains("inauguration")) {
-                Date inauguration = nextStatement.getObject().asLiteral().getDate();
-            } */ else if (predicate.contains("owner")) {
+            } else if (predicate.contains("inauguration")) {
+            //    Date inauguration = nextStatement.getObject().asLiteral().getDate();
+                String inauguration = nextStatement.getObject().asLiteral().toString();
+                result.put("inauguration", inauguration);
+            } else if (predicate.contains("owner")) {
                 String ownerUri = nextStatement.getObject().asResource().getURI();
                 result.put("ownerUri", ownerUri);
                 String owner = nextStatement.getObject().asResource().getLocalName();
@@ -1955,7 +2010,9 @@ public class ConsumingLinkedData {
                 String depiction = nextStatement.getObject().asResource().getURI();
                 result.put("depiction", depiction);
             } else if (predicate.contains("inaugurationDate")) {
-                Integer inaugurationDate = nextStatement.getObject().asLiteral().getInt();
+            //    Integer inaugurationDate = nextStatement.getObject().asLiteral().getInt();
+                String inaugurationDate = nextStatement.getObject().asLiteral().toString();
+                result.put("inaugurationDate", inaugurationDate);
             } else if (predicate.contains("renovationDate")) {
             //    Date renovationDate = nextStatement.getObject().asLiteral().getDate();
                 String renovationDate = nextStatement.getObject().asLiteral().toString();
@@ -2004,11 +2061,13 @@ public class ConsumingLinkedData {
                 String caption = nextStatement.getObject().asLiteral().toString();
                 result.put("caption", caption);
             } else if (predicate.contains("completed")) {
-                Integer completed = nextStatement.getObject().asLiteral().getInt();
+            //    Integer completed = nextStatement.getObject().asLiteral().getInt();
+                String completed = nextStatement.getObject().asLiteral().toString();
+                result.put("completed", completed);
             } else if (predicate.contains("buildingStartDate")) {
             //    Date buildingStartDate = nextStatement.getObject().asLiteral().getDate();
-                String buildingstartDate = nextStatement.getObject().asLiteral().toString();
-                result.put("buildingStartDate", buildingstartDate);
+                String buildingStartDate = nextStatement.getObject().asLiteral().toString();
+                result.put("buildingStartDate", buildingStartDate);
             } else if (predicate.contains("context")) {
                 String context = nextStatement.getObject().asLiteral().toString();
                 result.put("context", context);
@@ -2240,8 +2299,8 @@ public class ConsumingLinkedData {
                 result.put("openingDate", openingDate);
             } else if (predicate.contains("foundingDate")) {
             //    Date foundingDate = nextStatement.getObject().asLiteral().getDate();
-                String foundigDate = nextStatement.getObject().asLiteral().toString();
-                result.put("foundingDate", foundigDate);
+                String foundingDate = nextStatement.getObject().asLiteral().toString();
+                result.put("foundingDate", foundingDate);
             } else if (predicate.contains("foundingYear")) {
             //    Date foundingYear = nextStatement.getObject().asLiteral().getDate();
                 String foundingYear = nextStatement.getObject().asLiteral().toString();
@@ -2589,7 +2648,7 @@ public class ConsumingLinkedData {
                 result.put("buildingStartDate", buildingStartDate);
             } else if (predicate.contains("buildingEndDate")) {
                 String buildingEndDate = nextStatement.getObject().asLiteral().toString();
-                result.put("buildingendDate", buildingEndDate);
+                result.put("buildingEndDate", buildingEndDate);
             } else if (predicate.contains("formerName")) {
                 String formerName = nextStatement.getObject().asLiteral().toString();
                 result.put("formerName", formerName);
@@ -2843,7 +2902,7 @@ public class ConsumingLinkedData {
             } else if (predicate.contains("creator")) {
                 String creator = nextStatement.getObject().asLiteral().toString();
                 result.put("creator", creator);
-            } else if (predicate.contains("dateBuild")) {
+            } else if (predicate.contains("dateBuilt")) {
                 String dateBuilt = nextStatement.getObject().asLiteral().toString();
                 result.put("dateBuilt", dateBuilt);
             } else if (predicate.contains("numberOfTemples")) {
@@ -2961,7 +3020,7 @@ public class ConsumingLinkedData {
                 result.put("methodUri", methodUri);
                 String method = nextStatement.getObject().asResource().getLocalName();
                 result.put("method", method);
-            } else if (predicate.contains("government")) {
+            } else if (predicate.contains("governmentType")) {
                 String governmentTypeUri = nextStatement.getObject().asResource().getURI();
                 result.put("governmentTypeUri", governmentTypeUri);
                 String governmentType = nextStatement.getObject().asResource().getLocalName();
@@ -3240,8 +3299,8 @@ public class ConsumingLinkedData {
                 String openToPublic = nextStatement.getObject().asLiteral().toString();
                 result.put("openToPublic", openToPublic);
             } else if (predicate.contains("partof")) {
-                String partof = nextStatement.getObject().asLiteral().toString();
-                result.put("partof", partof);
+                String partOf = nextStatement.getObject().asLiteral().toString();
+                result.put("partOf", partOf);
             } else if (predicate.contains("width")) {
             //    Integer width = nextStatement.getObject().asLiteral().getInt();
                 String width = nextStatement.getObject().asLiteral().toString();
@@ -3471,7 +3530,7 @@ public class ConsumingLinkedData {
             } else if (predicate.contains("imageCaption")) {
                 String imageCaption = nextStatement.getObject().asLiteral().toString();
                 result.put("imageCaption", imageCaption);
-            } else if (predicate.contains("subdivision")) {
+            } else if (predicate.contains("subdivisionType")) {
                 String subdivisionTypeUri = nextStatement.getObject().asResource().getURI();
                 result.put("subdivisionTypeUri", subdivisionTypeUri);
                 String subdivisionType = nextStatement.getObject().asResource().getLocalName();
