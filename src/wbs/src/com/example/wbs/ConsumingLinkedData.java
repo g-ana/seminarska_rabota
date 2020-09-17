@@ -87,7 +87,7 @@ public class ConsumingLinkedData {
         if (name.contains(" ")) {
             name = name.replace(" ", "_");
         }
-        String queryString = "PREFIX dbr: " + resource + "DESCRIBE dbr:" + name;
+        String queryString = "String queryString = "DESCRIBE " + resource.substring(0, resource.length()-1) + name + ">";;
         Query query = QueryFactory.create(queryString);
         try (QueryExecution queryExecution = QueryExecutionFactory.sparqlService(SPARQLEndpoint, query)) {
             return queryExecution.execDescribe();
@@ -138,6 +138,7 @@ public class ConsumingLinkedData {
     } */
 
     public Map<String, String> findCategoryByName(String name) {
+		name = "Category:" + name;
         Model model = findByName(name);
         StmtIterator stmtIterator = model.listStatements();
         Map<String, String> result = new HashMap<String, String>();
