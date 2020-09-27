@@ -1,22 +1,13 @@
 package com.example.wbs;
 
-import org.apache.jena.atlas.json.JsonString;
-import org.json.JSONException;
-import org.json.JSONObject;
+import org.apache.jena.rdf.model.*;
 import org.apache.jena.query.*;
-import org.apache.jena.rdf.model.Model;
-import org.apache.jena.rdf.model.ModelFactory;
-import org.apache.jena.rdf.model.Statement;
-import org.apache.jena.rdf.model.StmtIterator;
-// import org.h2.util.json.JSONObject;
 import org.springframework.stereotype.Repository;
 
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-
-// import com.example.wp.backend.model.*;
 
 @Repository
 public class ConsumingLinkedData {
@@ -33,14 +24,6 @@ public class ConsumingLinkedData {
 //    private int page = 0;
 //    private int pageSize = 2;
 
-//    private RawJsonDeserializer rawJsonDeserializer = new RawJsonDeserializer();
-
-/*    private static JSONObject toJsonObject(Object object) throws JSONException {
-        StringBuilder jsonString = new StringBuilder();
-        jsonString.append(object.toString());
-        return new JSONObject(jsonString.toString());
-    } */
-
     private static List<Map<String, String>> findAll(String queryString) {
         Query query = QueryFactory.create(queryString);
         List<Map<String, String>> all = new ArrayList<Map<String, String>>();
@@ -48,7 +31,7 @@ public class ConsumingLinkedData {
             ResultSet results = queryExecution.execSelect();
             while (results.hasNext()) {
                 QuerySolution solution = results.nextSolution();
-                System.out.println(solution);
+            //    System.out.println(solution);
                 String url = solution.get("category").toString();
                 Model model = ModelFactory.createDefaultModel().read(url);
                 Map<String, String> result = new HashMap<String, String>();
@@ -59,10 +42,8 @@ public class ConsumingLinkedData {
                     String predicate = nextStatement.getPredicate().toString();
                     if (predicate.contains("label")) {
                         label = nextStatement.getObject().asLiteral().toString();
-                        label = label.substring(0, label.length() - 3);
+                        label = label.substring(0, label.indexOf("@"));
                         result.put("label", label);
-                        //    System.out.println(label);
-                        //    break;
                     }
                 }
                 all.add(result);
@@ -71,7 +52,7 @@ public class ConsumingLinkedData {
         }
     }
 
-        private static List<Map<String, String>> findAllPaged (String queryString,int page, int pageSize){
+        private static List<Map<String, String>> findAllPaged (String queryString, int page, int pageSize){
             List<Map<String, String>> paged = findAll(queryString);
             int pageStart = page * pageSize;
             int pageEnd = (page + 1) * pageSize;
@@ -84,10 +65,10 @@ public class ConsumingLinkedData {
 
 
     private static Model findByName(String name) throws QueryExecException {
-        if (name.contains(" ")) {
-            name = name.replace(" ", "_");
+        if (name.contains("-")) {
+            name = name.replace("-", "_");
         }
-        String queryString = "String queryString = "DESCRIBE " + resource.substring(0, resource.length()-1) + name + ">";;
+        String queryString = "DESCRIBE " + resource.substring(0, resource.length()-1) + name + ">";
         Query query = QueryFactory.create(queryString);
         try (QueryExecution queryExecution = QueryExecutionFactory.sparqlService(SPARQLEndpoint, query)) {
             return queryExecution.execDescribe();
@@ -97,48 +78,10 @@ public class ConsumingLinkedData {
      public List<Map<String, String>> findAllCategories() {
          String queryString = "PREFIX skos: " + skos + "PREFIX dbc: " + category + "SELECT ?category WHERE { ?category skos:broader dbc:Tourist_attractions . }";
          return findAll(queryString);
-     /*   List<Map<String, String>> categories = new ArrayList<Map<String, String>>();
-        Map<String, String> category = new HashMap<String, String>();
-        category.put("label", "beaches");
-        categories.add(category);
-        category.put("label", "buildings");
-        categories.add(category);
-        return categories; */
     }
 
-    /* public List<Category> findAllCategories() {
-        String queryString = "PREFIX skos: " + skos + "PREFIX dbc: " + category + "SELECT ?category WHERE { ?category skos:broader dbc:Tourist_attractions . }";
-        Query query = QueryFactory.create(queryString);
-        List<Category> all = new ArrayList<Map<String, String>>();
-        try (QueryExecution queryExecution = QueryExecutionFactory.sparqlService(SPARQLEndpoint, query)) {
-            ResultSet results = queryExecution.execSelect();
-            while (results.hasNext()) {
-                QuerySolution solution = results.nextSolution();
-                System.out.println(solution);
-                String url = solution.get("category").toString();
-                Model model = ModelFactory.createDefaultModel().read(url);
-                Category result = new Category();
-                StmtIterator iterator = model.listStatements();
-                String label = "";
-                while (iterator.hasNext()) {
-                    Statement nextStatement = iterator.nextStatement();
-                    String predicate = nextStatement.getPredicate().toString();
-                    if (predicate.contains("label")) {
-                        label = nextStatement.getObject().asLiteral().toString();
-                        label = label.substring(0, label.length() - 3);
-                        result.setLabel(label);
-                        //    System.out.println(label);
-                        //    break;
-                    }
-                }
-                all.add(result);
-            }
-        }
-        return all;
-    } */
-
     public Map<String, String> findCategoryByName(String name) {
-		name = "Category:" + name;
+        name = "Category:" + name;
         Model model = findByName(name);
         StmtIterator stmtIterator = model.listStatements();
         Map<String, String> result = new HashMap<String, String>();
@@ -148,19 +91,17 @@ public class ConsumingLinkedData {
             String predicate = nextStatement.getPredicate().toString();
             if (predicate.contains("label") && nextStatement.getLanguage().equals("en")) {
                 label = nextStatement.getObject().asLiteral().toString();
-                label = label.substring(0, label.length()-3);
+                label = label.substring(0, label.indexOf("@"));
                 result.put("label", label);
             }
         }
         String resourceUrl = label.endsWith("ies") ? resource.substring(0, resource.length()-1) +
                 label.substring(0, label.length()-3) + "y>" :
-                label.endsWith("ches") ? resource.substring(0, resource.length()-1)
+                label.endsWith("ches") ? resource.substring(0, resource.length()-1) + "/"
                 + label.substring(0, label.length()-2) + ">" :
-                label.endsWith("s") ? resource.substring(0, resource.length()-1)
+                label.endsWith("s") ? resource.substring(0, resource.length()-1) + "/"
                 + label.substring(0, label.length()-1) + ">"
-                : resource.substring(0, resource.length()-1) + label + ">";
-        //    System.out.println(resource.substring(0, resource.length()-1) + label.substring(0, label.length()-2) + ">");
-        //    System.out.println(resourceUrl);
+                : resource.substring(0, resource.length()-1) + "/" + label + ">";
         Model model2 = ModelFactory.createDefaultModel().read(resourceUrl.substring(1, resourceUrl.length()-1));
         StmtIterator statements = model2.listStatements();
         while (statements.hasNext()) {
@@ -168,7 +109,7 @@ public class ConsumingLinkedData {
             String predicate = nextStatement.getPredicate().toString();
             if (predicate.contains("abstract") && nextStatement.getLanguage().equals("en")) {
                 String comment = nextStatement.getObject().asLiteral().toString();
-                comment = comment.substring(0, comment.length()-3);
+                comment = comment.substring(0, comment.indexOf("@"));
                 result.put("abstract", comment);
             } else if (predicate.contains("caption")) {
                 String caption = nextStatement.getObject().asLiteral().toString();
@@ -191,75 +132,77 @@ public class ConsumingLinkedData {
 
     public List<Map<String, String>> findAllLandmarks() {
         List<Map<String, String>> result = new ArrayList<>();
-        result.add(this.findLandmarkByName("Kozjak_Hydro_Power_Plant"));
-        result.add(this.findLandmarkByName("Skopje_Fortress"));
-        result.add(this.findLandmarkByName("Skopje_Zoo"));
-        result.add(this.findLandmarkByName("Millennium_Cross"));
-        result.add(this.findLandmarkByName("Galichica"));
-        result.add(this.findLandmarkByName("Memorial_House_of_Mother_Teresa"));
-        result.add(this.findLandmarkByName("Church_of_St._Panteleimon_(Gorno_Nerezi)"));
-        result.add(this.findLandmarkByName("Stone_Bridge_(Skopje)"));
-        result.add(this.findLandmarkByName("Vodno"));
-        result.add(this.findLandmarkByName("Art_Bridge"));
-        result.add(this.findLandmarkByName("Skopje_Aqueduct"));
-        result.add(this.findLandmarkByName("Museum_of_the_Macedonian_Struggle_(Skopje)"));
-        result.add(this.findLandmarkByName("Porta_Macedonia"));
-        result.add(this.findLandmarkByName("Church_of_St._Clement_of_Ohrid"));
-        result.add(this.findLandmarkByName("Pella_Square"));
-        result.add(this.findLandmarkByName("Skanderbeg_Square_(Skopje)"));
-        result.add(this.findLandmarkByName("Macedonia_Square,_Skopje"));
-        result.add(this.findLandmarkByName("Cerje,_Skopje"));
-        result.add(this.findLandmarkByName("Old_Bazaar,_Skopje"));
-        result.add(this.findLandmarkByName("Kral_Kızı_Mausoleum"));
-        result.add(this.findLandmarkByName("Church_of_the_Ascension_of_Jesus,_Skopje"));
-        result.add(this.findLandmarkByName("Museum_of_the_City_of_Skopje"));
-        result.add(this.findLandmarkByName("Contemporary_Art_Museum_of_Macedonia"));
-        result.add(this.findLandmarkByName("Museum_of_Macedonia"));
-        result.add(this.findLandmarkByName("National_Gallery_of_Macedonia"));
-        result.add(this.findLandmarkByName("Čifte_Hammam"));
-        result.add(this.findLandmarkByName("Cathedral_of_the_Sacred_Heart_of_Jesus_(Skopje)"));
-        result.add(this.findLandmarkByName("Mustafa_Pasha_Mosque"));
-        result.add(this.findLandmarkByName("Sultan_Murad_Mosque"));
-        result.add(this.findLandmarkByName("Kapan_Han"));
-        result.add(this.findLandmarkByName("Suli_An"));
-        result.add(this.findLandmarkByName("Kuršumli_An"));
-        result.add(this.findLandmarkByName("Holocaust_Memorial_Center_for_the_Jews_of_Macedonia"));
-        result.add(this.findLandmarkByName("Rezhanovce_Museum_of_Folk_Costumes"));
-        result.add(this.findLandmarkByName("National_Institution_Museum,_Kumanovo"));
-        result.add(this.findLandmarkByName("Pelister_National_Park"));
-        result.add(this.findLandmarkByName("Mavrovo_National_Park"));
-        result.add(this.findLandmarkByName("Magnolia_Square"));
-        result.add(this.findLandmarkByName("Zebrnjak"));
-        result.add(this.findLandmarkByName("Chetiri_Bandere_Monument"));
-        result.add(this.findLandmarkByName("Ilinden_(memorial)"));
-        result.add(this.findLandmarkByName("Josip_Broz_Tito_Monument,_Kumanovo"));
-        result.add(this.findLandmarkByName("Philip_II_Statue"));
-        result.add(this.findLandmarkByName("Memorial_Ossuary_Kumanovo"));
-        result.add(this.findLandmarkByName("Mound_of_the_Unbeaten"));
-        result.add(this.findLandmarkByName("ASNOM_Memorial_Center"));
-        result.add(this.findLandmarkByName("Bitola_Zoo"));
-        result.add(this.findLandmarkByName("Markovi_Kuli"));
-        result.add(this.findLandmarkByName("Samuel's_Fortress,_Ohrid"));
-        result.add(this.findLandmarkByName("Viničko_Kale"));
-        result.add(this.findLandmarkByName("Strumica_Fortress"));
-        result.add(this.findLandmarkByName("Doiran_Lake"));
-        result.add(this.findLandmarkByName("Lake_Prespa"));
-        result.add(this.findLandmarkByName("Berovo_Lake"));
-        result.add(this.findLandmarkByName("Mavrovo_Lake"));
-        result.add(this.findLandmarkByName("Lake_Ohrid"));
-        result.add(this.findLandmarkByName("Ohrid-Prespa_Transboundary_Biosphere_Reserve"));
-        result.add(this.findLandmarkByName("Golem_Grad"));
-        result.add(this.findLandmarkByName("Matka_Canyon"));
-        result.add(this.findLandmarkByName("Kolešino_Falls"));
-        result.add(this.findLandmarkByName("Smolare_Falls"));
-        result.add(this.findLandmarkByName("Korab_Falls"));
-        result.add(this.findLandmarkByName("Bogomila_Falls"));
-        result.add(this.findLandmarkByName("Koprišnica_Falls"));
-        result.add(this.findLandmarkByName("Duf_Falls"));
-        result.add(this.findLandmarkByName("Aqua_Park_Macedonia"));
-        result.add(this.findLandmarkByName("Stone_town_of_Kuklica"));
-        result.add(this.findLandmarkByName("Lešok_Monastery"));
-        result.add(this.findLandmarkByName("Cocev_Kamen"));
+        String [] landmarks = {
+                "Kozjak_Hydro_Power_Plant",
+                "Skopje_Fortress",
+                "Skopje_Zoo",
+                "Millennium_Cross",
+                "Galichica",
+                "Memorial_House_of_Mother_Teresa",
+                "Church_of_St._Panteleimon_(Gorno_Nerezi)",
+                "Stone_Bridge_(Skopje)",
+                "Vodno",
+                "Art_Bridge",
+                "Skopje_Aqueduct",
+                "Museum_of_the_Macedonian_Struggle_(Skopje)",
+                "Porta_Macedonia",
+                "Church_of_St._Clement_of_Ohrid",
+                "Pella_Square", "Skanderbeg_Square_(Skopje)",
+                "Macedonia_Square,_Skopje", "Cerje,_Skopje",
+                "Old_Bazaar,_Skopje", "Kral_Kızı_Mausoleum",
+                "Church_of_the_Ascension_of_Jesus,_Skopje",
+                "Museum_of_the_City_of_Skopje",
+                "Contemporary_Art_Museum_of_Macedonia",
+                "Museum_of_Macedonia",
+                "National_Gallery_of_Macedonia",
+                "Čifte_Hammam",
+                "Cathedral_of_the_Sacred_Heart_of_Jesus_(Skopje)",
+                "Mustafa_Pasha_Mosque",
+                "Sultan_Murad_Mosque",
+                "Kapan_Han",
+                "Suli_An",
+                "Kuršumli_An",
+                "Holocaust_Memorial_Center_for_the_Jews_of_Macedonia",
+                "Rezhanovce_Museum_of_Folk_Costumes",
+                "National_Institution_Museum,_Kumanovo",
+                "Pelister_National_Park",
+                "Mavrovo_National_Park",
+                "Magnolia_Square",
+                "Zebrnjak",
+                "Chetiri_Bandere_Monument",
+                "Ilinden_(memorial)",
+                "Josip_Broz_Tito_Monument,_Kumanovo",
+                "Philip_II_Statue",
+                "Memorial_Ossuary_Kumanovo",
+                "Mound_of_the_Unbeaten",
+                "ASNOM_Memorial_Center",
+                "Bitola_Zoo",
+                "Markovi_Kuli",
+                "Samuel's_Fortress,_Ohrid",
+                "Viničko_Kale",
+                "Strumica_Fortress",
+                "Doiran_Lake",
+                "Lake_Prespa",
+                "Berovo_Lake",
+                "Mavrovo_Lake",
+                "Lake_Ohrid",
+                "Ohrid-Prespa_Transboundary_Biosphere_Reserve",
+                "Golem_Grad",
+                "Matka_Canyon",
+                "Kolešino_Falls",
+                "Smolare_Falls",
+                "Korab_Falls",
+                "Bogomila_Falls",
+                "Koprišnica_Falls",
+                "Duf_Falls",
+                "Aqua_Park_Macedonia",
+                "Stone_town_of_Kuklica",
+                "Lešok_Monastery",
+                "Cocev_Kamen",
+        };
+        for (String landmark : landmarks) {
+            result.add(this.findLandmarkByName(landmark));
+        }
         return result;
     }
 
@@ -275,9 +218,11 @@ public class ConsumingLinkedData {
                 String predicate = nextStatement.getPredicate().toString();
                 if (predicate.contains("label") && nextStatement.getLanguage().equals("en")) {
                     String label = nextStatement.getObject().asLiteral().toString();
+                    label = label.substring(0, label.indexOf("@"));
                     result.put("label", label);
                 } else if (predicate.contains("abstract") && nextStatement.getLanguage().equals("en")) {
                     String comment = nextStatement.getObject().asLiteral().toString();
+                    comment = comment.substring(0, comment.indexOf("@"));
                     result.put("abstract", comment);
                 } else if (predicate.contains("thumbnail")) {
                     String thumbnail = nextStatement.getObject().asResource().getURI();
@@ -286,7 +231,11 @@ public class ConsumingLinkedData {
                     String depiction = nextStatement.getObject().asResource().getURI();
                     result.put("depiction", depiction);
                 } else if (predicate.contains("caption") || predicate.contains("Caption")) {
-                    String caption = nextStatement.getObject().asLiteral().toString();
+                    RDFNode node = nextStatement.getObject();
+                    String caption = nextStatement.getObject().toString();
+                    if (node.isLiteral()) {
+                        caption = caption.substring(0, caption.indexOf("^"));
+                    }
                     result.put("caption", caption);
                 } else if (predicate.contains("placeType")) {
                     String placeTypeUri = nextStatement.getObject().asResource().getURI();
@@ -305,12 +254,15 @@ public class ConsumingLinkedData {
                     result.put("place", place);
                 } else if (predicate.contains("address")) {
                     String address = nextStatement.getObject().asLiteral().toString();
+                    address = address.contains("^") ? address.substring(0, address.indexOf("^")) : address;
                     result.put("address", address);
                 } else if (predicate.contains("bridgeCarries")) {
                     String bridgeCarries = nextStatement.getObject().asLiteral().toString();
+                    bridgeCarries = bridgeCarries.contains("^") ? bridgeCarries.substring(0, bridgeCarries.indexOf("^")) : bridgeCarries;
                     result.put("bridgeCarries", bridgeCarries);
                 } else if (predicate.contains("cost")) {
                     String cost = nextStatement.getObject().asLiteral().toString();
+                    cost = cost.contains("^") ? cost.substring(0, cost.indexOf("^")) : cost;
                     result.put("cost", cost);
                 } else if (predicate.contains("crosses")) {
                     String crossesUri = nextStatement.getObject().asResource().getURI();
@@ -319,12 +271,15 @@ public class ConsumingLinkedData {
                     result.put("crosses", crosses);
                 } else if (predicate.contains("width")) {
                     String width = nextStatement.getObject().asLiteral().toString();
+                    width = width.contains("^") ? width.substring(0, width.indexOf("^")) : width;
                     result.put("width", width);
                 } else if (predicate.contains("height")) {
                     String height = nextStatement.getObject().asLiteral().toString();
+                    height = height.contains("^") ? height.substring(0, height.indexOf("^")) : height;
                     result.put("height", height);
                 } else if (predicate.contains("highestLocation")) {
                     String highestLocation = nextStatement.getObject().asLiteral().toString();
+                    highestLocation = highestLocation.contains("^") ? highestLocation.substring(0, highestLocation.indexOf("^")) : highestLocation;
                     result.put("highestLocation", highestLocation);
                 } else if (predicate.contains("highest")) {
                     String highestUri = nextStatement.getObject().asResource().getURI();
@@ -352,26 +307,30 @@ public class ConsumingLinkedData {
                     String sourceCountry = nextStatement.getObject().asResource().getLocalName();
                     result.put("sourceCountry", sourceCountry);
                 } else if (predicate.contains("country")) {
-                    String countryUri = nextStatement.getObject().asResource().getURI();
-                    result.put("countryUri", countryUri);
-                    String country = nextStatement.getObject().asResource().getLocalName();
+                /*    String countryUri = nextStatement.getObject().asResource().getURI();
+                    result.put("countryUri", countryUri); */
+                    String country = nextStatement.getObject().toString();
                     result.put("country", country);
-                } else if (predicate.contains("location")) {
-                    String locationUri = nextStatement.getObject().asResource().getURI();
-                    result.put("locationUri", locationUri);
-                    String location = nextStatement.getObject().asResource().getLocalName();
+                }  else if (predicate.contains("location")) {
+                /*    String location = nextStatement.getObject().asLiteral().toString();
+                    result.put("locationUri", locationUri); */
+                    String location = nextStatement.getObject().toString();
                     result.put("location", location);
                 } else if (predicate.contains("zooName")) {
                     String zooName = nextStatement.getObject().asLiteral().toString();
+                    zooName = zooName.contains("^") ? zooName.substring(0, zooName.indexOf("^")) : zooName;
                     result.put("zooName", zooName);
                 } else if (predicate.contains("numAnimals")) {
                     String numAnimals = nextStatement.getObject().asLiteral().toString();
+                    numAnimals = numAnimals.contains("^") ? numAnimals.substring(0, numAnimals.indexOf("^")) : numAnimals;
                     result.put("numAnimals", numAnimals);
                 } else if (predicate.contains("numSpecies")) {
                     String numSpecies = nextStatement.getObject().asLiteral().toString();
+                    numSpecies = numSpecies.contains("^") ? numSpecies.substring(0, numSpecies.indexOf("^")) : numSpecies;
                     result.put("numSpecies", numSpecies);
                 } else if (predicate.contains("dateOpened")) {
                     String dateOpened = nextStatement.getObject().asLiteral().toString();
+                    dateOpened = dateOpened.contains("^") ? dateOpened.substring(0, dateOpened.indexOf("^")) : dateOpened;
                     result.put("dateOpened", dateOpened);
                 } else if (predicate.contains("website")) {
                     String websiteUri = nextStatement.getObject().asResource().getURI();
@@ -380,20 +339,23 @@ public class ConsumingLinkedData {
                     result.put("website", website);
                 } else if (predicate.contains("buildingEndDate")) {
                     String buildingEndDate = nextStatement.getObject().asLiteral().toString();
+                    buildingEndDate = buildingEndDate.contains("^") ? buildingEndDate.substring(0, buildingEndDate.indexOf("^")) : buildingEndDate;
                     result.put("buildingEndDate", buildingEndDate);
                 } else if (predicate.contains("material")) {
-                    String material = nextStatement.getObject().asLiteral().toString();
+                    String material = nextStatement.getObject().toString();
                     result.put("material", material);
                 } else if (predicate.contains("regionCode")) {
                     String regionCode = nextStatement.getObject().asLiteral().toString();
+                    regionCode = regionCode.contains("^") ? regionCode.substring(0, regionCode.indexOf("^")) : regionCode;
                     result.put("regionCode", regionCode);
                 } else if (predicate.contains("region")) {
-                    String regionUri = nextStatement.getObject().asResource().getURI();
-                    result.put("regionUri", regionUri);
-                    String region = nextStatement.getObject().asResource().getLocalName();
+                /*    String regionUri = nextStatement.getObject().asResource().getURI();
+                    result.put("regionUri", regionUri); */
+                    String region = nextStatement.getObject().toString();
                     result.put("region", region);
                 } else if (predicate.contains("elevation")) {
                     String elevation = nextStatement.getObject().asLiteral().toString();
+                    elevation = elevation.contains("^") ? elevation.substring(0, elevation.indexOf("^")) : elevation;
                     result.put("elevation", elevation);
                 } else if (predicate.contains("architecturalStyle")) {
                     String architecturalStyleUri = nextStatement.getObject().asResource().getURI();
@@ -401,29 +363,41 @@ public class ConsumingLinkedData {
                     String architecturalStyle = nextStatement.getObject().asResource().getLocalName();
                     result.put("architecturalStyle", architecturalStyle);
                 } else if (predicate.contains("architectureStyle")) {
-                    String architectureStyleUri = nextStatement.getObject().asResource().getURI();
-                    result.put("architectureStyleUri", architectureStyleUri);
-                    String architectureStyle = nextStatement.getObject().asResource().getLocalName();
+                /*    String architectureStyleUri = nextStatement.getObject().asResource().getURI();
+                    result.put("architectureStyleUri", architectureStyleUri); */
+                    RDFNode node = nextStatement.getObject();
+                    String architectureStyle = "";
+                    if (node.isResource()) {
+                        architectureStyle = nextStatement.getObject().asResource().getLocalName();
+                        String architectureStyleUri = nextStatement.getObject().asResource().getURI();
+                        result.put("architectureStyleUri", architectureStyleUri);
+                    }
+                    else if (node.isLiteral()) {
+                        architectureStyle = nextStatement.getObject().asLiteral().toString();
+                    }
                     result.put("architectureStyle", architectureStyle);
                 } else if (predicate.contains("architectureType")) {
                     String architectureType = nextStatement.getObject().asLiteral().toString();
+                    architectureType  = architectureType.contains("^") ? architectureType.substring(0, architectureType.indexOf("^")) : architectureType;
                     result.put("architectureType", architectureType);
                 } else if (predicate.contains("architect")) {
-                    String architect = nextStatement.getObject().asLiteral().toString();
+                    String architect = nextStatement.getObject().toString();
                     result.put("architect", architect);
                 } else if (predicate.contains("lakeType")) {
                     String lakeType = nextStatement.getObject().asLiteral().toString();
+                    lakeType = lakeType.contains("^") ? lakeType.substring(0, lakeType.indexOf("^")) : lakeType;
                     result.put("lakeType", lakeType);
                 } else if (predicate.contains("stateType")) {
                     String stateType = nextStatement.getObject().asLiteral().toString();
+                    stateType = stateType.contains("^") ? stateType.substring(0, stateType.indexOf("^")) : stateType;
                     result.put("stateType", stateType);
                 } else if (predicate.contains("type")) {
-                    String type = nextStatement.getObject().asLiteral().toString();
+                    String type = nextStatement.getObject().toString();
                     result.put("type", type);
-                } else if (predicate.contains("client")) {
-                    String clientUri = nextStatement.getObject().asResource().getURI();
-                    result.put("clientUri", clientUri);
-                    String client = nextStatement.getObject().asResource().getLocalName();
+                }  else if (predicate.contains("client")) {
+                /*    String clientUri = nextStatement.getObject().asResource().getURI();
+                    result.put("clientUri", clientUri); */
+                    String client = nextStatement.getObject().toString();
                     result.put("client", client);
                 } else if (predicate.contains("mainContractor")) {
                     String mainContractorUri = nextStatement.getObject().asResource().getURI();
@@ -432,6 +406,7 @@ public class ConsumingLinkedData {
                     result.put("mainContractor", mainContractor);
                 } else if (predicate.contains("alternateNames")) {
                     String alternateNames = nextStatement.getObject().asLiteral().toString();
+                    alternateNames = alternateNames.contains("^") ? alternateNames.substring(0, alternateNames.indexOf("^")) : alternateNames;
                     result.put("alternateNames", alternateNames);
                 } else if (predicate.contains("significantBuilding")) {
                     String significantBuildingUri = nextStatement.getObject().asResource().getURI();
@@ -439,9 +414,9 @@ public class ConsumingLinkedData {
                     String significantBuilding = nextStatement.getObject().asResource().getLocalName();
                     result.put("significantBuilding", significantBuilding);
                 } else if (predicate.contains("religiousAffiliation")) {
-                    String religiousAffiliationUri = nextStatement.getObject().asResource().getURI();
-                    result.put("religiousAffiliationUri", religiousAffiliationUri);
-                    String religiousAffiliation = nextStatement.getObject().asResource().getLocalName();
+                /*    String religiousAffiliationUri = nextStatement.getObject().asResource().getURI();
+                    result.put("religiousAffiliationUri", religiousAffiliationUri); */
+                    String religiousAffiliation = nextStatement.getObject().toString();
                     result.put("religiousAffiliation", religiousAffiliation);
                 } else if (predicate.contains("district")) {
                     String districtUri = nextStatement.getObject().asResource().getURI();
@@ -450,21 +425,27 @@ public class ConsumingLinkedData {
                     result.put("district", district);
                 } else if (predicate.contains("yearCompleted")) {
                     String yearCompleted = nextStatement.getObject().asLiteral().toString();
+                    yearCompleted = yearCompleted.contains("^") ? yearCompleted.substring(0, yearCompleted.indexOf("^")) : yearCompleted;
                     result.put("yearCompleted", yearCompleted);
                 } else if (predicate.contains("domeQuantity")) {
                     String domeQuantity = nextStatement.getObject().asLiteral().toString();
+                    domeQuantity = domeQuantity.contains("^") ? domeQuantity.substring(0, domeQuantity.indexOf("^")) : domeQuantity;
                     result.put("domeQuantity", domeQuantity);
                 } else if (predicate.contains("minaretQuantity")) {
                     String minaretQuantity = nextStatement.getObject().asLiteral().toString();
+                    minaretQuantity = minaretQuantity.contains("^") ? minaretQuantity.substring(0, minaretQuantity.indexOf("^")) : minaretQuantity;
                     result.put("minaretQuantity", minaretQuantity);
                 } else if (predicate.contains("engineer")) {
                     String engineer = nextStatement.getObject().asLiteral().toString();
+                    engineer = engineer.contains("^") ? engineer.substring(0, engineer.indexOf("^")) : engineer;
                     result.put("engineer", engineer);
                 } else if (predicate.contains("formerName")) {
                     String formerName = nextStatement.getObject().asLiteral().toString();
+                    formerName = formerName.contains("^") ? formerName.substring(0, formerName.indexOf("^")) : formerName;
                     result.put("formerName", formerName);
                 } else if (predicate.contains("postalCode")) {
                     String postalCode = nextStatement.getObject().asLiteral().toString();
+                    postalCode = postalCode.contains("^") ? postalCode.substring(0, postalCode.indexOf("^")) : postalCode;
                     result.put("postalCode", postalCode);
                 } else if (predicate.contains("builder")) {
                     String builderUri = nextStatement.getObject().asResource().getURI();
@@ -478,6 +459,7 @@ public class ConsumingLinkedData {
                     result.put("controlledBy", controlledBy);
                 } else if (predicate.contains("buildingStartDate")) {
                     String buildingStartDate = nextStatement.getObject().asLiteral().toString();
+                    buildingStartDate = buildingStartDate.contains("^") ? buildingStartDate.substring(0, buildingStartDate.indexOf("^")) : buildingStartDate;
                     result.put("buildingStartDate", buildingStartDate);
                 } else if (predicate.contains("routeStart")) {
                     String routeStartUri = nextStatement.getObject().asResource().getURI();
@@ -486,39 +468,51 @@ public class ConsumingLinkedData {
                     result.put("routeStart", routeStart);
                 } else if (predicate.contains("easiestRoute")) {
                     String easiestRoute = nextStatement.getObject().asLiteral().toString();
+                    easiestRoute = easiestRoute.contains("^") ? easiestRoute.substring(0, easiestRoute.indexOf("^")) : easiestRoute;
                     result.put("easiestRoute", easiestRoute);
                 } else if (predicate.contains("terminusB")) {
                     String terminusB = nextStatement.getObject().asLiteral().toString();
+                    terminusB = terminusB.contains("^") ? terminusB.substring(0, terminusB.indexOf("^")) : terminusB;
                     result.put("terminusB", terminusB);
                 } else if (predicate.contains("openToPublic")) {
                     String openToPublic = nextStatement.getObject().asLiteral().toString();
+                    openToPublic = openToPublic.contains("^") ? openToPublic.substring(0, openToPublic.indexOf("^")) : openToPublic;
                     result.put("openToPublic", openToPublic);
                 } else if (predicate.contains("established")) {
                     String established = nextStatement.getObject().asLiteral().toString();
+                    established = established.contains("^") ? established.substring(0, established.indexOf("^")) : established;
                     result.put("established", established);
                 } else if (predicate.contains("director")) {
                     String director = nextStatement.getObject().asLiteral().toString();
+                    director = director.contains("^") ? director.substring(0, director.indexOf("^")) : director;
                     result.put("director", director);
                 } else if (predicate.contains("maximumDepth")) {
                     String maximumDepth = nextStatement.getObject().asLiteral().toString();
+                    maximumDepth = maximumDepth.contains("^") ? maximumDepth.substring(0, maximumDepth.indexOf("^")) : maximumDepth;
                     result.put("maximumDepth", maximumDepth);
                 } else if (predicate.contains("averageDepth")) {
                     String averageDepth = nextStatement.getObject().asLiteral().toString();
+                    averageDepth = averageDepth.contains("^") ? averageDepth.substring(0, averageDepth.indexOf("^")) : averageDepth;
                     result.put("averageDepth", averageDepth);
                 } else if (predicate.contains("shoreLength")) {
                     String shoreLength = nextStatement.getObject().asLiteral().toString();
+                    shoreLength = shoreLength.contains("^") ? shoreLength.substring(0, shoreLength.indexOf("^")) : shoreLength;
                     result.put("shoreLength", shoreLength);
                 } else if (predicate.contains("length")) {
                     String length = nextStatement.getObject().asLiteral().toString();
+                    length = length.contains("^") ? length.substring(0, length.indexOf("^")) : length;
                     result.put("length", length);
                 } else if (predicate.contains("areaOfCatchment")) {
                     String areaOfCatchment = nextStatement.getObject().asLiteral().toString();
+                    areaOfCatchment = areaOfCatchment.contains("^") ? areaOfCatchment.substring(0, areaOfCatchment.indexOf("^")) : areaOfCatchment;
                     result.put("areaOfCatchment", areaOfCatchment);
                 } else if (predicate.contains("areaTotal")) {
                     String areaTotal = nextStatement.getObject().asLiteral().toString();
+                    areaTotal = areaTotal.contains("^") ? areaTotal.substring(0, areaTotal.indexOf("^")) : areaTotal;
                     result.put("areaTotal", areaTotal);
                 } else if (predicate.contains("volume")) {
                     String volume = nextStatement.getObject().asLiteral().toString();
+                    volume = volume.contains("^") ? volume.substring(0, volume.indexOf("^")) : volume;
                     result.put("volume", volume);
                 } else if (predicate.contains("nearest")) {
                     String nearestUri = nextStatement.getObject().asResource().getURI();
@@ -531,17 +525,18 @@ public class ConsumingLinkedData {
                     String city = nextStatement.getObject().asResource().getLocalName();
                     result.put("city", city);
                 } else if (predicate.contains("inflow")) {
-                    String inflowUri = nextStatement.getObject().asResource().getURI();
-                    result.put("inflowUri", inflowUri);
-                    String inflow = nextStatement.getObject().asResource().getLocalName();
+                /*    String inflowUri = nextStatement.getObject().asResource().getURI();
+                    result.put("inflowUri", inflowUri); */
+                    String inflow = nextStatement.getObject().toString();
                     result.put("inflow", inflow);
                 } else if (predicate.contains("outflow")) {
-                    String outflowUri = nextStatement.getObject().asResource().getURI();
-                    result.put("outflowUri", outflowUri);
-                    String outflow = nextStatement.getObject().asResource().getLocalName();
+                /*    String outflowUri = nextStatement.getObject().asResource().getURI();
+                    result.put("outflowUri", outflowUri); */
+                    String outflow = nextStatement.getObject().toString();
                     result.put("outflow", outflow);
                 } else if (predicate.contains("islands")) {
                     String islands = nextStatement.getObject().asLiteral().toString();
+                    islands = islands.contains("^") ? islands.substring(0, islands.indexOf("^")) : islands;
                     result.put("islands", islands);
                 } else if (predicate.contains("island")) {
                     String islandUri = nextStatement.getObject().asResource().getURI();
@@ -550,15 +545,19 @@ public class ConsumingLinkedData {
                     result.put("island", island);
                 } else if (predicate.contains("description")) {
                     String description = nextStatement.getObject().asLiteral().toString();
+                    description = description.contains("^") ? description.substring(0, description.indexOf("^")) : description;
                     result.put("description", description);
                 } else if (predicate.contains("openingYear")) {
                     String openingYear = nextStatement.getObject().asLiteral().toString();
+                    openingYear = openingYear.contains("^") ? openingYear.substring(0, openingYear.indexOf("^")) : openingYear;
                     result.put("openingYear", openingYear);
                 } else if (predicate.contains("purpose")) {
                     String purpose = nextStatement.getObject().asLiteral().toString();
+                    purpose = purpose.contains("^") ? purpose.substring(0, purpose.indexOf("^")) : purpose;
                     result.put("purpose", purpose);
                 } else if (predicate.contains("status")) {
                     String status = nextStatement.getObject().asLiteral().toString();
+                    status = status.contains("^") ? status.substring(0, status.indexOf("^")) : status;
                     result.put("status", status);
                 } else if (predicate.contains("lake")) {
                     String lakeUri = nextStatement.getObject().asResource().getURI();
@@ -577,9 +576,11 @@ public class ConsumingLinkedData {
                     result.put("river", river);
                 } else if (predicate.contains("otherTitle")) {
                     String otherTitle = nextStatement.getObject().asLiteral().toString();
+                    otherTitle = otherTitle.contains("^") ? otherTitle.substring(0, otherTitle.indexOf("^")) : otherTitle;
                     result.put("otherTitle", otherTitle);
                 } else if (predicate.contains("nativeName") || predicate.contains("nameNative")) {
                     String nativeName = nextStatement.getObject().asLiteral().toString();
+                    nativeName = nativeName.contains("^") ? nativeName.substring(0, nativeName.indexOf("^")) : nativeName;
                     result.put("nativeName", nativeName);
                 } else if (predicate.contains("author")) {
                     String authorUri = nextStatement.getObject().asResource().getURI();
@@ -588,14 +589,16 @@ public class ConsumingLinkedData {
                     result.put("author", author);
                 } else if (predicate.contains("dedicatedTo")) {
                     String dedicatedTo = nextStatement.getObject().asLiteral().toString();
+                    dedicatedTo = dedicatedTo.contains("^") ? dedicatedTo.substring(0, dedicatedTo.indexOf("^")) : dedicatedTo;
                     result.put("dedicatedTo", dedicatedTo);
                 } else if (predicate.contains("complete")) {
                     String complete = nextStatement.getObject().asLiteral().toString();
+                    complete = complete.contains("^") ? complete.substring(0, complete.indexOf("^")) : complete;
                     result.put("complete", complete);
                 } else if (predicate.contains("designer")) {
-                    String designerUri = nextStatement.getObject().asResource().getURI();
-                    result.put("designerUri", designerUri);
-                    String designer = nextStatement.getObject().asResource().getLocalName();
+                /*    String designerUri = nextStatement.getObject().asResource().getURI();
+                    result.put("designerUri", designerUri); */
+                    String designer = nextStatement.getObject().toString();
                     result.put("designer", designer);
                 } else if (predicate.contains("cathedral")) {
                     String cathedralUri = nextStatement.getObject().asResource().getURI();
@@ -604,9 +607,11 @@ public class ConsumingLinkedData {
                     result.put("cathedral", cathedral);
                 } else if (predicate.contains("created")) {
                     String created = nextStatement.getObject().asLiteral().toString();
+                    created = created.contains("^") ? created.substring(0, created.indexOf("^")) : created;
                     result.put("created", created);
                 } else if (predicate.contains("population")) {
                     String population = nextStatement.getObject().asLiteral().toString();
+                    population = population.contains("^") ? population.substring(0, population.indexOf("^")) : population;
                     result.put("population", population);
                 } else if (predicate.contains("countryAdminDevisionsTitle")) {
                     String countryAdminDevisionsTitleUri = nextStatement.getObject().asResource().getURI();
@@ -615,15 +620,19 @@ public class ConsumingLinkedData {
                     result.put("countryAdminDevisionsTitle", countryAdminDevisionsTitle);
                 } else if (predicate.contains("churches")) {
                     String churches = nextStatement.getObject().asLiteral().toString();
+                    churches = churches.contains("^") ? churches.substring(0, churches.indexOf("^")) : churches;
                     result.put("churches", churches);
                 } else if (predicate.contains("dedication")) {
                     String dedication = nextStatement.getObject().asLiteral().toString();
+                    dedication = dedication.contains("^") ? dedication.substring(0, dedication.indexOf("^")) : dedication;
                     result.put("dedication", dedication);
                 } else if (predicate.contains("diocese")) {
                     String diocese = nextStatement.getObject().asLiteral().toString();
+                    diocese = diocese.contains("^") ? diocese.substring(0, diocese.indexOf("^")) : diocese;
                     result.put("diocese", diocese);
                 } else if (predicate.contains("abbot")) {
                     String abbot = nextStatement.getObject().asLiteral().toString();
+                    abbot = abbot.contains("^") ? abbot.substring(0, abbot.indexOf("^")) : abbot;
                     result.put("abbot", abbot);
                 } else if (predicate.contains("order")) {
                     String orderUri = nextStatement.getObject().asResource().getURI();
@@ -637,12 +646,15 @@ public class ConsumingLinkedData {
                     result.put("prior", prior);
                 } else if (predicate.contains("publicAccess")) {
                     String publicAccess = nextStatement.getObject().asLiteral().toString();
+                    publicAccess = publicAccess.contains("^") ? publicAccess.substring(0, publicAccess.indexOf("^")) : publicAccess;
                     result.put("publicAccess", publicAccess);
                 } else if (predicate.contains("relief")) {
                     String relief = nextStatement.getObject().asLiteral().toString();
+                    relief = relief.contains("^") ? relief.substring(0, relief.indexOf("^")) : relief;
                     result.put("relief", relief);
                 } else if (predicate.contains("condition")) {
                     String condition = nextStatement.getObject().asLiteral().toString();
+                    condition = condition.contains("^") ? condition.substring(0, condition.indexOf("^")) : condition;
                     result.put("condition", condition);
                 } else if (predicate.contains("mouthMountain")) {
                     String mouthMountainUri = nextStatement.getObject().asResource().getURI();
@@ -664,12 +676,15 @@ public class ConsumingLinkedData {
                     result.put("mouthPosition", mouthPosition);
                 } else if (predicate.contains("tributariesLeft")) {
                     String tributariesLeft = nextStatement.getObject().asLiteral().toString();
+                    tributariesLeft = tributariesLeft.contains("^") ? tributariesLeft.substring(0, tributariesLeft.indexOf("^")) : tributariesLeft;
                     result.put("tributariesLeft", tributariesLeft);
                 } else if (predicate.contains("tributariesRight")) {
                     String tributariesRight = nextStatement.getObject().asLiteral().toString();
+                    tributariesRight = tributariesRight.contains("^") ? tributariesRight.substring(0, tributariesRight.indexOf("^")) : tributariesRight;
                     result.put("tributariesRight", tributariesRight);
                 } else if (predicate.contains("prominence")) {
                     String prominence = nextStatement.getObject().asLiteral().toString();
+                    prominence = prominence.contains("^") ? prominence.substring(0, prominence.indexOf("^")) : prominence;
                     result.put("prominence", prominence);
                 } else if (predicate.contains("headquarters")) {
                     String headquartersUri = nextStatement.getObject().asResource().getURI();
@@ -683,6 +698,7 @@ public class ConsumingLinkedData {
                     result.put("mountainRange", mountainRange);
                 } else if (predicate.contains("geology")) {
                     String geology = nextStatement.getObject().asLiteral().toString();
+                    geology = geology.contains("^") ? geology.substring(0, geology.indexOf("^")) : geology;
                     result.put("geology", geology);
                 } else if (predicate.contains("militaryUnit")) {
                     String militaryUnitUri = nextStatement.getObject().asResource().getURI();
@@ -4024,176 +4040,4 @@ public class ConsumingLinkedData {
         }
         return result;
     }
-
- /*      public static void main(String [] args) {
-           ConsumingLinkedData consumingLinkedData = new ConsumingLinkedData();
-           Map<String, String> beaches = consumingLinkedData.findCategoryByName("Beaches");
-           System.out.println(beaches.toString()); */
-       /*    consumingLinkedData.findAllBeaches();
-           System.out.println();
-           consumingLinkedData.findAllBeachesByCountry("Australia"); */
-/*          String resource1URL = "http://dbpedia.org/resource/Tunnel_of_Love_(railway)";
-            Model model1 = ModelFactory.createDefaultModel();
-        model1.read(resource1URL);
-        StmtIterator stmtIterator = model1.listStatements();
-        while(stmtIterator.hasNext())
-
-    {
-        Statement nextStatement = stmtIterator.nextStatement();
-        //    System.out.println(nextStatement.getPredicate().toString());
-        if (nextStatement.getPredicate().toString().equals(ontology + "abstract")) {
-            String comment = nextStatement.getObject().asLiteral().toString();
-            System.out.println("Abstract: " + comment);
-        }
-        if (nextStatement.getPredicate().toString().equals(ontology + "lineLength")) {
-            Double lineLength = nextStatement.getObject().asLiteral().getDouble();
-            System.out.println("LineLength: " + lineLength);
-        }
-        if (nextStatement.getPredicate().toString().equals(ontology + "location")) {
-            Resource location = nextStatement.getObject().asResource();
-            String l = location.toString();
-            System.out.println("Location: " + l);
-        }
-        if (nextStatement.getPredicate().toString().equals(ontology + "operator")) {
-            Resource operator = nextStatement.getObject().asResource();
-            String o = operator.toString();
-            System.out.println("operator: " + o);
-        }
-        if (nextStatement.getPredicate().toString().equals(ontology + "routeStart")) {
-            Resource routeStart = nextStatement.getObject().asResource();
-            String rs = routeStart.toString();
-            System.out.println("Route start: " + rs);
-        }
-        if (nextStatement.getPredicate().toString().equals(ontology + "routeEnd")) {
-            Resource routeEnd = nextStatement.getObject().asResource();
-            String re = routeEnd.toString();
-            System.out.println("Route end: " + re);
-        }
-        if (nextStatement.getPredicate().toString().equals(ontology + "type")) {
-            Resource type = nextStatement.getObject().asResource();
-            String t = type.toString();
-            System.out.println("Type: " + t);
-        }
-        if (nextStatement.getPredicate().toString().equals("dbp:caption")) {
-            String caption = nextStatement.getObject().asLiteral().toString();
-            //    String c = caption.toString();
-            System.out.println("Caption: " + caption);
-        }
-        if (nextStatement.getPredicate().toString().equals("dbp:title")) {
-            String title = nextStatement.getObject().asLiteral().toString();
-            //    String ti = title.toString();
-            System.out.println("Title: " + title);
-        }
-        if (nextStatement.getPredicate().toString().equals("dbp:notrack")) {
-            Resource routeEnd = nextStatement.getObject().asResource();
-            String nt = routeEnd.toString();
-            System.out.println("Notrack: " + nt);
-        }
-        if (nextStatement.getPredicate().toString().equals("rdfs:label")) {
-            String label = nextStatement.getObject().asLiteral().toString();
-            //    String l = label.toString();
-            System.out.println("Label: " + label);
-        }
-        if (nextStatement.getPredicate().toString().equals("foaf:name")) {
-            String name = nextStatement.getObject().asLiteral().toString();
-            //    String n = name.toString();
-            System.out.println("Name: " + name);
-        }
-    }
-        model1.write(System.out,"JSON-LD");
-
-    String resource2URL = "http://dbpedia.org/resource/Daymark";
-    Model model2 = ModelFactory.createDefaultModel();
-        model2.read(resource2URL);
-    StmtIterator si = model2.listStatements();
-        while(si.hasNext())
-
-    {
-        Statement ns = si.nextStatement();
-        System.out.println(ns.getPredicate().toString());
-
-        if (ns.getPredicate().toString().equals("http://dbpedia.org/ontology/abstract")) {
-            Literal c = ns.getObject().asLiteral();
-            if (c.getLanguage().equals("en")) {
-                String comment = c.toString();
-                System.out.println(comment);
-            }
-        }
-
-        if (ns.getPredicate().toString().equals("http://xmlns.com/foaf/0.1/depiction")) {
-            Resource d = ns.getObject().asResource();
-            StmtIterator stmtIterator1 = d.listProperties();
-            while (stmtIterator1.hasNext()) {
-                Property next = stmtIterator1.nextStatement().getPredicate();
-                String s = next.getURI();
-                System.out.println(s);
-            }
-        }
-    }
-
-    String resource3URL = "http://dbpedia.org/resource/Colonna_Mediterranea";
-    Model model3 = ModelFactory.createDefaultModel();
-        model3.read(resource3URL);
-    StmtIterator stmtIterator1 = model3.listStatements();
-        while(stmtIterator1.hasNext())
-
-    {
-        Statement statement = stmtIterator1.nextStatement();
-        String predicate = statement.getPredicate().toString();
-        System.out.println(predicate);
-        System.out.println();
-
-        if (predicate.equals("http://dbpedia.org/ontology/location")) {
-            Resource l = statement.getObject().asResource();
-            String location = l.getLocalName();
-            String url = l.getURI();
-            System.out.println(location + " " + url);
-        }
-
-        if (predicate.equals("http://dbpedia.org/ontology/buildingEndDate")) {
-            Literal d = statement.getObject().asLiteral();
-            String date = d.toString();
-            System.out.println(date);
-        }
-
-        if (predicate.equals("http://dbpedia.org/property/imageCaption")) {
-            Literal ic = statement.getObject().asLiteral();
-            String imageCaption = ic.toString();
-            System.out.println(imageCaption);
-        }
-
-        if (predicate.equals("http://xmlns.com/foaf/0.1/depiction")) {
-            Resource n = statement.getObject().asResource();
-            String url = n.getURI();
-            String depiction = n.getLocalName();
-            System.out.println(url);
-            System.out.println(depiction);
-        }
-
-        if (predicate.equals("http://dbpedia.org/ontology/architecturalStyle")) {
-            Resource as = statement.getObject().asResource();
-            String architecturalStyle = as.getLocalName();
-            String url = as.getURI();
-            System.out.println(architecturalStyle + " " + url);
-        }
-
-        if (predicate.equals("http://dbpedia.org/ontology/owner")) {
-            Resource o = statement.getObject().asResource();
-            String owner = o.getLocalName();
-            String url = o.getURI();
-            System.out.println(owner + " " + url);
-        }
-
-        if (predicate.equals("http://www.w3.org/1999/02/22-rdf-syntax-ns#type")) {
-            Resource t = statement.getObject().asResource();
-            String type = t.toString();
-            System.out.println(type);
-        }
-
-        if (predicate.equals("http://www.w3.org/2000/01/rdf-schema#comment")) {
-            Literal c = statement.getObject().asLiteral();
-            String comment = c.toString();
-            System.out.println(comment);
-        } */
-//    }
 }
